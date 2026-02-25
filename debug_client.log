@@ -1,0 +1,30 @@
+
+> client@0.0.0 dev
+> vite
+
+[2m10:38:19 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+
+  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m648[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m10:40:23 pm[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Cannot find module './config/files/index.js'
+Require stack:
+- D:\AI Projects\ZTA\ZT-Options-App\client\node_modules\@babel\core\lib\index.js
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/AI Projects/ZTA/ZT-Options-App/client/src/main.jsx[39m
+[2m10:40:23 pm[22m [31m[1m[vite][22m[39m [31mInternal server error: Cannot find module './config/files/index.js'
+Require stack:
+- D:\AI Projects\ZTA\ZT-Options-App\client\node_modules\@babel\core\lib\index.js[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mD:/AI Projects/ZTA/ZT-Options-App/client/src/main.jsx[39m
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+      at Module._load (node:internal/modules/cjs/loader:1227:37)
+      at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+      at Module.require (node:internal/modules/cjs/loader:1504:12)
+      at require (node:internal/modules/helpers:152:16)
+      at Object.<anonymous> (D:\AI Projects\ZTA\ZT-Options-App\client\node_modules\@babel\core\lib\index.js:173:17)
+      at Module._compile (node:internal/modules/cjs/loader:1761:14)
