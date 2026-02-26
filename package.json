@@ -1,0 +1,32 @@
+{
+  "name": "rams_options_mob",
+  "version": "1.0.0",
+  "description": "- **server/**: Node.js backend with Puppeteer (for NSE/BSE scraping) and SQLite.\r - **client/**: React (Vite) frontend.",
+  "main": "test_fin_dates.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RamsMurugan70/Rams_Options_Mobile.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RamsMurugan70/Rams_Options_Mobile/issues"
+  },
+  "homepage": "https://github.com/RamsMurugan70/Rams_Options_Mobile#readme",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "body-parser": "^2.2.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "mysql2": "^3.18.1",
+    "node-cache": "^5.1.2",
+    "serverless-http": "^4.0.0"
+  }
+}
