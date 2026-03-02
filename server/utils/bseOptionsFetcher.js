@@ -50,34 +50,45 @@ function extractBseOptionFields(row, strike, type) {
 
 async function fetchSensexOptionChain() {
     console.log('[BSE Options Serverless] Fetching BSE Spot via Axios...');
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Referer': 'https://www.bseindia.com/',
+        'Accept': 'application/json, text/plain, */*'
+    };
+
     let spot = 0;
     try {
-        const spotRes = await axios.get(`${BSE_API_BASE}/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=${SENSEX_SCRIP_CD}&seriesid=`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Referer': 'https://www.bseindia.com/',
-                'Accept': 'application/json, text/plain, */*'
-            }
-        });
+        const spotRes = await axios.get(`${BSE_API_BASE}/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=${SENSEX_SCRIP_CD}&seriesid=`, { headers });
         spot = parseBseNumber(spotRes.data?.CurrRate?.LTP) || 0;
     } catch (e) {
         console.error('[BSE Options Serverless] Spot fetch error:', e.message);
     }
 
-    const candidateFridays = getUpcomingFridays(4).map(formatBSEDate);
+    // Fetch real expiry dates from BSE API instead of guessing Fridays
+    let candidateDates;
+    try {
+        console.log('[BSE Options Serverless] Fetching active expiries from BSE API...');
+        const expiryRes = await axios.get(`${BSE_API_BASE}/BseIndiaAPI/api/ddlExpiry_New/w?scrip_cd=${SENSEX_SCRIP_CD}`, { headers });
+        const expiryData = expiryRes.data;
+        if (expiryData && expiryData.Table1 && expiryData.Table1.length > 0) {
+            candidateDates = expiryData.Table1.map(t => t.ExpiryDate).slice(0, 4);
+            console.log('[BSE Options Serverless] Active expiries from API:', candidateDates);
+        } else {
+            candidateDates = getUpcomingFridays(4).map(formatBSEDate);
+            console.log('[BSE Options Serverless] API returned empty, falling back to Fridays:', candidateDates);
+        }
+    } catch (e) {
+        console.error('[BSE Options Serverless] Expiry API failed, falling back to Fridays:', e.message);
+        candidateDates = getUpcomingFridays(4).map(formatBSEDate);
+    }
+
     const targetExpiries = [];
 
-    for (const expiry of candidateFridays) {
+    for (const expiry of candidateDates) {
         if (targetExpiries.length >= 2) break;
         console.log(`[BSE Options Serverless] Fetching expiry: ${expiry}`);
         try {
-            const res = await axios.get(`${BSE_API_BASE}/BseIndiaAPI/api/DerivOptionChain_IV/w?Expiry=${encodeURIComponent(expiry)}&scrip_cd=${SENSEX_SCRIP_CD}&strprice=0`, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Referer': 'https://www.bseindia.com/',
-                    'Accept': 'application/json, text/plain, */*'
-                }
-            });
+            const res = await axios.get(`${BSE_API_BASE}/BseIndiaAPI/api/DerivOptionChain_IV/w?Expiry=${encodeURIComponent(expiry)}&scrip_cd=${SENSEX_SCRIP_CD}&strprice=0`, { headers });
             const json = res.data;
             if (json && json.Table && json.Table.length > 0) {
                 targetExpiries.push({ expiry, data: json.Table });

@@ -1,7 +1,7 @@
 {
     "name": "zt-options-app-server",
     "version": "1.0.0",
-    "description": "Standalone backend for ZTA Options Tracker",
+    "description": "Standalone backend for ZTA Options Tracker (Netlify Serverless)",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

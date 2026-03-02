@@ -49,6 +49,42 @@ const OptionsTrackerPage = () => {
         return `₹${n.toFixed(2)}`;
     };
 
+    // Dynamic expiry label: "This Thursday", "Next Monday", or "06-Mar-2026 (Thursday)"
+    const getExpiryMetadata = (expiryStr) => {
+        if (!expiryStr) return { label: expiryStr, isMonthly: false };
+        const months = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        let parts = expiryStr.split('-');
+        if (parts.length !== 3) parts = expiryStr.split(' ');
+        if (parts.length !== 3) return { label: expiryStr, isMonthly: false };
+        const expDate = new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0], 10));
+        if (isNaN(expDate.getTime())) return { label: expiryStr, isMonthly: false };
+        const dayName = days[expDate.getDay()];
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59);
+        const startOfNextWeek = new Date(endOfWeek);
+        startOfNextWeek.setDate(endOfWeek.getDate() + 1);
+        startOfNextWeek.setHours(0, 0, 0, 0);
+        const endOfNextWeek = new Date(startOfNextWeek);
+        endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+        endOfNextWeek.setHours(23, 59, 59);
+        const plus7 = new Date(expDate);
+        plus7.setDate(plus7.getDate() + 7);
+        const isMonthly = plus7.getMonth() !== expDate.getMonth();
+        let label;
+        if (expDate >= startOfWeek && expDate <= endOfWeek) { label = `This ${dayName}`; }
+        else if (expDate >= startOfNextWeek && expDate <= endOfNextWeek) { label = `Next ${dayName}`; }
+        else { label = `${expiryStr} (${dayName})`; }
+        return { label, isMonthly, dayName };
+    };
+
+    const spotLabel = data?.label || symbol;
+
     const OptionCard = ({ title, optionData, type, expiry }) => {
         if (!optionData) {
             return (
@@ -64,7 +100,6 @@ const OptionsTrackerPage = () => {
 
         return (
             <div className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden`}>
-                {/* Header */}
                 <div className={`px-5 py-3 bg-gradient-to-r ${isCE ? 'from-emerald-500 to-teal-600' : 'from-rose-500 to-pink-600'} text-white`}>
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
@@ -81,7 +116,6 @@ const OptionsTrackerPage = () => {
                     </div>
                 </div>
 
-                {/* Metrics Grid */}
                 <div className="p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                         <MetricBox label="Open Interest" value={formatNumber(optionData.oi)} icon={<BarChart3 size={14} />} />
@@ -119,9 +153,6 @@ const OptionsTrackerPage = () => {
         </div>
     );
 
-    const expiryLabel = data?.expiryDay || (symbol === 'NIFTY' ? 'Tuesday' : 'Thursday');
-    const spotLabel = data?.label || symbol;
-
     return (
         <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
             {/* Header */}
@@ -146,7 +177,7 @@ const OptionsTrackerPage = () => {
                                     : 'text-slate-500 hover:text-slate-700'
                                     }`}
                             >
-                                {s === 'FINNIFTY' ? 'FINNIFTY' : s}
+                                {s}
                             </button>
                         ))}
                     </div>
@@ -206,11 +237,11 @@ const OptionsTrackerPage = () => {
                             </div>
                             <div className="flex justify-between md:text-right md:space-y-2 gap-4 md:gap-0">
                                 <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-lg px-3 py-1.5 flex-1 md:flex-none">
-                                    <p className="text-[10px] text-emerald-300 uppercase font-medium">CE Strike ({data.anchorPrice ? 'Open' : 'Spot'} + {data.strikeOffset || (symbol === 'NIFTY' ? 1000 : 3500)})</p>
+                                    <p className="text-[10px] text-emerald-300 uppercase font-medium">CE Strike ({data.anchorPrice ? 'Open' : 'Spot'} + {data.strikeOffset || 1000})</p>
                                     <p className="font-bold text-emerald-400 text-lg">{formatNumber(data.ceStrike)}</p>
                                 </div>
                                 <div className="bg-rose-500/20 border border-rose-500/30 rounded-lg px-3 py-1.5 flex-1 md:flex-none">
-                                    <p className="text-[10px] text-rose-300 uppercase font-medium">PE Strike ({data.anchorPrice ? 'Open' : 'Spot'} − {data.strikeOffset || (symbol === 'NIFTY' ? 1000 : 3500)})</p>
+                                    <p className="text-[10px] text-rose-300 uppercase font-medium">PE Strike ({data.anchorPrice ? 'Open' : 'Spot'} − {data.strikeOffset || 1000})</p>
                                     <p className="font-bold text-rose-400 text-lg">{formatNumber(data.peStrike)}</p>
                                 </div>
                             </div>
@@ -218,34 +249,38 @@ const OptionsTrackerPage = () => {
                     </div>
 
                     {/* Expiry Sections */}
-                    {data.expiries?.map((exp, idx) => (
-                        <div key={exp.expiry} className="space-y-4">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                                <h2 className="text-lg font-bold text-slate-700">
-                                    {data.expiryDay?.startsWith('Monthly')
-                                        ? (idx === 0 ? '📅 This Month' : '📅 Next Month')
-                                        : (idx === 0 ? `📅 This ${expiryLabel}` : `📅 Next ${expiryLabel}`)}
-                                </h2>
-                                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold self-start md:self-auto">
-                                    Expiry: {exp.expiry}
-                                </span>
+                    {data.expiries?.map((exp) => {
+                        const meta = getExpiryMetadata(exp.expiry);
+                        return (
+                            <div key={exp.expiry} className="space-y-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                    <h2 className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                        📅 {meta.label}
+                                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.isMonthly ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {meta.isMonthly ? 'MONTHLY' : 'WEEKLY'}
+                                        </span>
+                                    </h2>
+                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold self-start md:self-auto">
+                                        Expiry: {exp.expiry}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                    <OptionCard
+                                        title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.ceStrike} CE ${exp.expiry}`}
+                                        optionData={exp.ce}
+                                        type="CE"
+                                        expiry={exp.expiry}
+                                    />
+                                    <OptionCard
+                                        title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.peStrike} PE ${exp.expiry}`}
+                                        optionData={exp.pe}
+                                        type="PE"
+                                        expiry={exp.expiry}
+                                    />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                                <OptionCard
-                                    title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.ceStrike} CE`}
-                                    optionData={exp.ce}
-                                    type="CE"
-                                    expiry={exp.expiry}
-                                />
-                                <OptionCard
-                                    title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.peStrike} PE`}
-                                    optionData={exp.pe}
-                                    type="PE"
-                                    expiry={exp.expiry}
-                                />
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
