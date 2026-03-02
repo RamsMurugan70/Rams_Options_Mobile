@@ -5,8 +5,6 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  included_files = ["server/**"]
-  external_node_modules = ["winston", "yahoo-finance2"]
 
 [[redirects]]
   from = "/api/*"
