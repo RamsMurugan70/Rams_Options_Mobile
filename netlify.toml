@@ -1,16 +1,12 @@
 [build]
-  command = "cd client && npm install && npm run build"
+  command = "cd server && npm install && cd ../client && npm install && npm run build"
   publish = "client/dist"
 
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
   included_files = ["server/**"]
-
-[functions."api"]
-  # Netlify free tier allows up to 26s for background functions
-  # BSE scraping can take 10-15s, so we need the max
-  external_node_modules = ["yahoo-finance2"]
+  external_node_modules = ["winston", "stock-nse-india", "yahoo-finance2"]
 
 [[redirects]]
   from = "/api/*"
