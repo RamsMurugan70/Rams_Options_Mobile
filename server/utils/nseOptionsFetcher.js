@@ -1,67 +1,25 @@
+const axios = require('axios');
+
 // In-Memory map to cache the daily open price so we don't spam Yahoo
 const anchorCache = {};
-const { NseIndia } = require('stock-nse-india');
-const nseIndia = new NseIndia();
-
-const NSE_OC_URL = 'https://www.nseindia.com/option-chain';
 
 // Per-symbol configuration
 const SYMBOL_CONFIG = {
-    NIFTY: { strikeOffset: 1000, expiryDay: 4, label: 'NIFTY 50', yahooSymbol: '^NSEI' },
-    BANKNIFTY: { strikeOffset: 2500, expiryDay: 3, label: 'BANKNIFTY', yahooSymbol: '^NSEBANK' },
-    FINNIFTY: { strikeOffset: 1200, expiryDay: 2, label: 'FINNIFTY', apiSymbol: 'FINNIFTY', yahooSymbol: 'NIFTY_FIN_SERVICE.NS' },
+    NIFTY: { strikeOffset: 1000, expiryDay: 4, label: 'NIFTY 50', yahooSymbol: '^NSEI', nseSymbol: 'NIFTY' },
+    BANKNIFTY: { strikeOffset: 2500, expiryDay: 3, label: 'BANKNIFTY', yahooSymbol: '^NSEBANK', nseSymbol: 'BANKNIFTY' },
+    FINNIFTY: { strikeOffset: 1200, expiryDay: 2, label: 'FINNIFTY', yahooSymbol: 'NIFTY_FIN_SERVICE.NS', nseSymbol: 'FINNIFTY' },
     SENSEX: { strikeOffset: 3500, expiryDay: 5, label: 'SENSEX', yahooSymbol: '^BSESN' },
-    MIDCPNIFTY: { strikeOffset: 600, expiryDay: 1, label: 'MIDCAP NIFTY', yahooSymbol: '^NSEMDCP50' }
+    MIDCPNIFTY: { strikeOffset: 600, expiryDay: 1, label: 'MIDCAP NIFTY', yahooSymbol: '^NSEMDCP50', nseSymbol: 'MIDCPNIFTY' }
 };
 const VALID_SYMBOLS = Object.keys(SYMBOL_CONFIG);
 
-function getUpcomingWeekdays(dayOfWeek, count = 2) {
-    const dates = [];
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    while (dates.length < count) {
-        if (d.getDay() === dayOfWeek) {
-            dates.push(new Date(d));
-        }
-        d.setDate(d.getDate() + 1);
-    }
-    return dates;
-}
-
-function getUpcomingTuesdays(count = 2) { return getUpcomingWeekdays(2, count); }
-function getUpcomingThursdays(count = 2) { return getUpcomingWeekdays(4, count); }
-
-function getLastWeekdayOfMonth(year, month, dayOfWeek) {
-    const lastDay = new Date(year, month + 1, 0);
-    while (lastDay.getDay() !== dayOfWeek) {
-        lastDay.setDate(lastDay.getDate() - 1);
-    }
-    return lastDay;
-}
-
-function getUpcomingMonthlyExpiries(dayOfWeek, count = 2) {
-    const dates = [];
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    let year = now.getFullYear();
-    let month = now.getMonth();
-
-    while (dates.length < count) {
-        const lastDay = getLastWeekdayOfMonth(year, month, dayOfWeek);
-        if (lastDay >= now) {
-            dates.push(lastDay);
-        }
-        month++;
-        if (month > 11) { month = 0; year++; }
-    }
-    return dates;
-}
-
-function formatNSEDate(date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dd = String(date.getDate()).padStart(2, '0');
-    return `${dd}-${months[date.getMonth()]}-${date.getFullYear()}`;
-}
+const NSE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.nseindia.com/option-chain',
+    'Origin': 'https://www.nseindia.com'
+};
 
 function extractOptionFields(optObj, strike) {
     if (!optObj) return null;
@@ -81,30 +39,48 @@ function extractOptionFields(optObj, strike) {
     };
 }
 
+// Try to fetch NSE option chain via direct API call
+// NSE blocks cloud IPs, so this may fail on Netlify — that's OK, we handle it gracefully
 async function fetchOptionChain(symbol = 'NIFTY') {
     const upperSymbol = symbol.toUpperCase();
     const config = SYMBOL_CONFIG[upperSymbol] || SYMBOL_CONFIG.NIFTY;
-    const apiSymbol = config.apiSymbol || upperSymbol;
+    const nseSymbol = config.nseSymbol || upperSymbol;
 
-    const allIntercepted = [];
-    let expiryDates = [];
+    console.log(`[NSE Options] Fetching option chain for ${nseSymbol}...`);
 
-    console.log(`[NSE Options Serverless] Fetching via stock-nse-india API for ${apiSymbol}...`);
+    // First, get a session cookie from NSE
+    let cookies = '';
     try {
-        const apiData = await nseIndia.getIndexOptionChain(apiSymbol);
-        if (apiData && apiData.records) {
-            console.log(`[NSE Options Serverless] Successfully fetched data from API. Status: OK`);
-            allIntercepted.push({ expiry: null, data: apiData });
-            expiryDates = apiData.records.expiryDates || [];
-        } else {
-            throw new Error('[NSE Options Serverless] stock-nse-india API returned empty or invalid data format.');
+        const sessionRes = await axios.get('https://www.nseindia.com/option-chain', {
+            headers: NSE_HEADERS,
+            maxRedirects: 5,
+            timeout: 8000
+        });
+        const setCookies = sessionRes.headers['set-cookie'];
+        if (setCookies) {
+            cookies = setCookies.map(c => c.split(';')[0]).join('; ');
         }
     } catch (e) {
-        console.error('[NSE Options Serverless] stock-nse-india API fetch failed:', e.message);
-        throw new Error('Failed to fetch NSE option chain data: ' + e.message);
+        console.log('[NSE Options] Session cookie fetch failed (expected on cloud):', e.message);
     }
 
-    return { intercepted: allIntercepted, expiryDates };
+    // Now fetch the actual option chain data
+    const apiUrl = `https://www.nseindia.com/api/option-chain-indices?symbol=${encodeURIComponent(nseSymbol)}`;
+    const res = await axios.get(apiUrl, {
+        headers: { ...NSE_HEADERS, Cookie: cookies },
+        timeout: 8000
+    });
+
+    const apiData = res.data;
+    if (!apiData || !apiData.records) {
+        throw new Error('NSE API returned empty data');
+    }
+
+    console.log(`[NSE Options] Successfully fetched ${nseSymbol}. Expiry dates: ${(apiData.records.expiryDates || []).length}`);
+    return {
+        intercepted: [{ expiry: null, data: apiData }],
+        expiryDates: apiData.records.expiryDates || []
+    };
 }
 
 function getTargetExpiries(nseExpiries, symbol = 'NIFTY') {
@@ -117,7 +93,6 @@ async function getAnchorPrice(symbol) {
     const yahooSymbol = config.yahooSymbol;
     const today = new Date().toISOString().split('T')[0];
 
-    // Check memory cache first
     if (anchorCache[symbol] && anchorCache[symbol].date === today) {
         return anchorCache[symbol].price;
     }
@@ -128,11 +103,10 @@ async function getAnchorPrice(symbol) {
         const quote = await yahooFinance.quote(yahooSymbol);
         if (quote && quote.regularMarketOpen) {
             const open = quote.regularMarketOpen;
-            anchorCache[symbol] = { date: today, price: open }; // Save to memory!
+            anchorCache[symbol] = { date: today, price: open };
             return open;
-        } else {
-            return null;
         }
+        return null;
     } catch (e) {
         console.error(`[Anchor] Error fetching ${symbol}:`, e.message);
         return null;
@@ -162,19 +136,13 @@ async function getOptionsTrackerData(symbol = 'NIFTY') {
     }
 
     const expiries = targetExpiries.map(expiry => {
-        // Find matching intercepted data OR fallback to the universal 'null' expiry payload
         const match = raw.intercepted.find(i => i.expiry === expiry) || raw.intercepted.find(i => !i.expiry);
 
         let dataRows = [];
         if (match && match.data && match.data.records) {
-            // For universal fetches, we MUST filter data rows by expiryDate or expiryDates array
             if (!match.expiry) {
                 dataRows = match.data.records.data.filter(d => {
                     if (d.expiryDate && d.expiryDate === expiry) return true;
-                    if (d.expiryDates) {
-                        if (typeof d.expiryDates === 'string' && d.expiryDates === expiry) return true;
-                        if (Array.isArray(d.expiryDates) && d.expiryDates.includes(expiry)) return true;
-                    }
                     if (d.CE && d.CE.expiryDate === expiry) return true;
                     if (d.PE && d.PE.expiryDate === expiry) return true;
                     return false;
@@ -203,24 +171,9 @@ async function getOptionsTrackerData(symbol = 'NIFTY') {
         ceStrike,
         peStrike,
         strikeOffset: config.strikeOffset,
-        expiryDay: config.monthly ? (config.expiryDay === 1 ? 'Monthly (Last Monday)' : 'Monthly (Last Tuesday)') : (config.expiryDay === 1 ? 'Monday' : config.expiryDay === 2 ? 'Tuesday' : 'Thursday'),
+        expiryDay: config.expiryDay === 1 ? 'Monday' : config.expiryDay === 2 ? 'Tuesday' : config.expiryDay === 3 ? 'Wednesday' : 'Thursday',
         expiries
     };
 }
 
 module.exports = { getOptionsTrackerData };
-
-// Test script for standalone execution
-if (require.main === module) {
-    (async () => {
-        try {
-            console.log("Testing FINNIFTY Fetch...");
-            const data = await getOptionsTrackerData('FINNIFTY');
-            console.log("Success! Spot:", data.spot);
-        } catch (e) {
-            console.error("Test Error:", e);
-        } finally {
-            process.exit(0);
-        }
-    })();
-}
