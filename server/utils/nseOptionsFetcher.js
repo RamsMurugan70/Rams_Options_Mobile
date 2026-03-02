@@ -39,48 +39,95 @@ function extractOptionFields(optObj, strike) {
     };
 }
 
-// Try to fetch NSE option chain via direct API call
-// NSE blocks cloud IPs, so this may fail on Netlify — that's OK, we handle it gracefully
-async function fetchOptionChain(symbol = 'NIFTY') {
-    const upperSymbol = symbol.toUpperCase();
-    const config = SYMBOL_CONFIG[upperSymbol] || SYMBOL_CONFIG.NIFTY;
-    const nseSymbol = config.nseSymbol || upperSymbol;
+// ─── Multi-Proxy Fallback Chain ───
+// NSE blocks cloud/data center IPs (Netlify, AWS, etc.)
+// Strategy: try direct first, then fall back through free CORS proxies.
 
-    console.log(`[NSE Options] Fetching option chain for ${nseSymbol}...`);
+const PROXY_STRATEGIES = [
+    {
+        name: 'Direct NSE',
+        buildSessionUrl: () => 'https://www.nseindia.com/option-chain',
+        buildApiUrl: (nseSymbol) => `https://www.nseindia.com/api/option-chain-indices?symbol=${encodeURIComponent(nseSymbol)}`,
+        parseResponse: (data) => data,
+    },
+    {
+        name: 'corsproxy.io',
+        buildSessionUrl: () => 'https://corsproxy.io/?' + encodeURIComponent('https://www.nseindia.com/option-chain'),
+        buildApiUrl: (nseSymbol) => 'https://corsproxy.io/?' + encodeURIComponent(`https://www.nseindia.com/api/option-chain-indices?symbol=${encodeURIComponent(nseSymbol)}`),
+        parseResponse: (data) => data,
+    },
+    {
+        name: 'allorigins.win',
+        buildSessionUrl: () => 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.nseindia.com/option-chain'),
+        buildApiUrl: (nseSymbol) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://www.nseindia.com/api/option-chain-indices?symbol=${encodeURIComponent(nseSymbol)}`),
+        parseResponse: (data) => data,
+    },
+];
 
-    // First, get a session cookie from NSE
+async function tryFetchWithStrategy(strategy, nseSymbol) {
+    console.log(`[NSE Options] Trying strategy: ${strategy.name} for ${nseSymbol}...`);
+
+    // Step 1: Get a session cookie (best-effort)
     let cookies = '';
     try {
-        const sessionRes = await axios.get('https://www.nseindia.com/option-chain', {
+        const sessionUrl = strategy.buildSessionUrl();
+        const sessionRes = await axios.get(sessionUrl, {
             headers: NSE_HEADERS,
             maxRedirects: 5,
-            timeout: 8000
+            timeout: 10000
         });
         const setCookies = sessionRes.headers['set-cookie'];
         if (setCookies) {
             cookies = setCookies.map(c => c.split(';')[0]).join('; ');
         }
     } catch (e) {
-        console.log('[NSE Options] Session cookie fetch failed (expected on cloud):', e.message);
+        console.log(`[NSE Options] [${strategy.name}] Session cookie failed (continuing):`, e.message);
     }
 
-    // Now fetch the actual option chain data
-    const apiUrl = `https://www.nseindia.com/api/option-chain-indices?symbol=${encodeURIComponent(nseSymbol)}`;
+    // Step 2: Fetch the option chain data
+    const apiUrl = strategy.buildApiUrl(nseSymbol);
     const res = await axios.get(apiUrl, {
-        headers: { ...NSE_HEADERS, Cookie: cookies },
-        timeout: 8000
+        headers: { ...NSE_HEADERS, ...(cookies ? { Cookie: cookies } : {}) },
+        timeout: 10000
     });
 
-    const apiData = res.data;
+    let apiData = res.data;
+    // Some proxies may return the data as a string
+    if (typeof apiData === 'string') {
+        try { apiData = JSON.parse(apiData); } catch (e) { /* leave as-is */ }
+    }
+    apiData = strategy.parseResponse(apiData);
+
     if (!apiData || !apiData.records) {
-        throw new Error('NSE API returned empty data');
+        throw new Error(`${strategy.name}: NSE API returned empty/invalid data`);
     }
 
-    console.log(`[NSE Options] Successfully fetched ${nseSymbol}. Expiry dates: ${(apiData.records.expiryDates || []).length}`);
-    return {
-        intercepted: [{ expiry: null, data: apiData }],
-        expiryDates: apiData.records.expiryDates || []
-    };
+    console.log(`[NSE Options] ✓ ${strategy.name} succeeded for ${nseSymbol}. Expiry dates: ${(apiData.records.expiryDates || []).length}`);
+    return apiData;
+}
+
+async function fetchOptionChain(symbol = 'NIFTY') {
+    const upperSymbol = symbol.toUpperCase();
+    const config = SYMBOL_CONFIG[upperSymbol] || SYMBOL_CONFIG.NIFTY;
+    const nseSymbol = config.nseSymbol || upperSymbol;
+
+    console.log(`[NSE Options] Fetching option chain for ${nseSymbol} (will try ${PROXY_STRATEGIES.length} strategies)...`);
+
+    const errors = [];
+    for (const strategy of PROXY_STRATEGIES) {
+        try {
+            const apiData = await tryFetchWithStrategy(strategy, nseSymbol);
+            return {
+                intercepted: [{ expiry: null, data: apiData }],
+                expiryDates: apiData.records.expiryDates || []
+            };
+        } catch (e) {
+            console.error(`[NSE Options] ✗ ${strategy.name} failed:`, e.message);
+            errors.push(`${strategy.name}: ${e.message}`);
+        }
+    }
+
+    throw new Error(`All proxy strategies failed for ${nseSymbol}. Errors: ${errors.join(' | ')}`);
 }
 
 function getTargetExpiries(nseExpiries, symbol = 'NIFTY') {
