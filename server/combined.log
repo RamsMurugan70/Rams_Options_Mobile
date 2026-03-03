@@ -2862,3 +2862,6 @@
 {"level":"info","message":"[Options Prefetch] Fetching FINNIFTY...","timestamp":"2026-02-26T11:58:22.858Z"}
 {"level":"info","message":"[Options Prefetch] FINNIFTY failed: socket hang up","timestamp":"2026-02-26T11:58:28.700Z"}
 {"level":"info","message":"[Options Prefetch] Fetching MIDCPNIFTY...","timestamp":"2026-02-26T11:58:28.700Z"}
+{"level":"info","message":"Server running on port 5003","timestamp":"2026-03-02T18:51:58.124Z"}
+{"level":"info","message":"[Options API] Fetching fresh NIFTY data...","timestamp":"2026-03-02T18:52:23.405Z"}
+{"level":"info","message":"[Options API] Fetching fresh SENSEX data...","timestamp":"2026-03-02T18:53:01.656Z"}
