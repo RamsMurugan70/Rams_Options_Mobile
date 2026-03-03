@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { RefreshCw, TrendingUp, TrendingDown, Activity, Clock, AlertTriangle, BarChart3, IndianRupee, ArrowUpDown } from 'lucide-react';
+import { RefreshCw, TrendingUp, TrendingDown, Activity, Clock, AlertTriangle, BarChart3, IndianRupee, ArrowUpDown, Copy, Check } from 'lucide-react';
 
 const API_URL = '/api/options';
 
@@ -85,6 +85,18 @@ const OptionsTrackerPage = () => {
 
     const spotLabel = data?.label || symbol;
 
+    // Normalize expiry format: "10-Mar-2026" → "10 Mar 2026"
+    const normalizeExpiry = (expiry) => expiry ? expiry.replace(/-/g, ' ') : expiry;
+
+    const [copiedTitle, setCopiedTitle] = useState(null);
+
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedTitle(text);
+            setTimeout(() => setCopiedTitle(null), 1500);
+        });
+    };
+
     const OptionCard = ({ title, optionData, type, expiry }) => {
         if (!optionData) {
             return (
@@ -97,6 +109,7 @@ const OptionsTrackerPage = () => {
 
         const isCE = type === 'CE';
         const Icon = isCE ? TrendingUp : TrendingDown;
+        const isCopied = copiedTitle === title;
 
         return (
             <div className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden`}>
@@ -105,6 +118,13 @@ const OptionsTrackerPage = () => {
                         <div className="flex items-center gap-2">
                             <Icon size={18} />
                             <span className="font-bold text-lg">{title}</span>
+                            <button
+                                onClick={() => copyToClipboard(title)}
+                                className="ml-1 p-1 rounded hover:bg-white/20 transition-colors"
+                                title={isCopied ? 'Copied!' : 'Copy option name'}
+                            >
+                                {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                            </button>
                         </div>
                         <span className="text-2xl font-black">{formatCurrency(optionData.ltp)}</span>
                     </div>
@@ -266,13 +286,13 @@ const OptionsTrackerPage = () => {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                     <OptionCard
-                                        title={`${symbol} ${data.ceStrike} CE ${exp.expiry}`}
+                                        title={`${symbol} ${data.ceStrike} CE ${normalizeExpiry(exp.expiry)}`}
                                         optionData={exp.ce}
                                         type="CE"
                                         expiry={exp.expiry}
                                     />
                                     <OptionCard
-                                        title={`${symbol} ${data.peStrike} PE ${exp.expiry}`}
+                                        title={`${symbol} ${data.peStrike} PE ${normalizeExpiry(exp.expiry)}`}
                                         optionData={exp.pe}
                                         type="PE"
                                         expiry={exp.expiry}
