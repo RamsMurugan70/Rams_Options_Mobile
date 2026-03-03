@@ -6,10 +6,7 @@ const anchorCache = {};
 // Per-symbol configuration
 const SYMBOL_CONFIG = {
     NIFTY: { strikeOffset: 1000, expiryDay: 4, label: 'NIFTY 50', yahooSymbol: '^NSEI', nseSymbol: 'NIFTY', growwSymbol: 'NIFTY' },
-    BANKNIFTY: { strikeOffset: 2500, expiryDay: 3, label: 'BANKNIFTY', yahooSymbol: '^NSEBANK', nseSymbol: 'BANKNIFTY', growwSymbol: null },
-    FINNIFTY: { strikeOffset: 1200, expiryDay: 2, label: 'FINNIFTY', yahooSymbol: 'NIFTY_FIN_SERVICE.NS', nseSymbol: 'FINNIFTY', growwSymbol: null },
-    SENSEX: { strikeOffset: 3500, expiryDay: 5, label: 'SENSEX', yahooSymbol: '^BSESN' },
-    MIDCPNIFTY: { strikeOffset: 600, expiryDay: 1, label: 'MIDCAP NIFTY', yahooSymbol: '^NSEMDCP50', nseSymbol: 'MIDCPNIFTY', growwSymbol: null }
+    SENSEX: { strikeOffset: 3500, expiryDay: 5, label: 'SENSEX', yahooSymbol: '^BSESN' }
 };
 const VALID_SYMBOLS = Object.keys(SYMBOL_CONFIG);
 

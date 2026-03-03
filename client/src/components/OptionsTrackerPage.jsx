@@ -168,7 +168,7 @@ const OptionsTrackerPage = () => {
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
                     {/* Symbol Toggle */}
                     <div className="flex overflow-x-auto bg-slate-100 rounded-lg p-0.5 whitespace-nowrap scrollbar-hide">
-                        {['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX'].map((s) => (
+                        {['NIFTY', 'SENSEX'].map((s) => (
                             <button
                                 key={s}
                                 onClick={() => handleSymbolToggle(s)}
@@ -266,13 +266,13 @@ const OptionsTrackerPage = () => {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                                     <OptionCard
-                                        title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.ceStrike} CE ${exp.expiry}`}
+                                        title={`${symbol} ${data.ceStrike} CE ${exp.expiry}`}
                                         optionData={exp.ce}
                                         type="CE"
                                         expiry={exp.expiry}
                                     />
                                     <OptionCard
-                                        title={`${symbol === 'MIDCPNIFTY' ? 'MIDCAPNIFTY' : symbol} ${data.peStrike} PE ${exp.expiry}`}
+                                        title={`${symbol} ${data.peStrike} PE ${exp.expiry}`}
                                         optionData={exp.pe}
                                         type="PE"
                                         expiry={exp.expiry}

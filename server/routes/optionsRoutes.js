@@ -7,7 +7,7 @@ const log = require('../utils/logger');
 // In-memory cache (serverless-compatible, no filesystem needed)
 const cacheMap = {};
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const VALID_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX'];
+const VALID_SYMBOLS = ['NIFTY', 'SENSEX'];
 
 // Helper: parse expiry date strings like "06-Mar-2026" or "05 Mar 2026" into Date
 function parseExpiryDate(dateStr) {
