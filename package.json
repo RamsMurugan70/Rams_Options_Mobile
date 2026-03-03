@@ -4,7 +4,8 @@
   "description": "- **server/**: Node.js backend with Puppeteer (for NSE/BSE scraping) and SQLite.\r - **client/**: React (Vite) frontend.",
   "main": "test_fin_dates.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "cd client && npm install && npm run build"
   },
   "repository": {
     "type": "git",
